@@ -3,8 +3,8 @@ const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const errorHandler = require("./authMiddleware/errorMiddleware");
-const admin = require("firebase-admin");
-const serviceAccount = require("./utils/sustylo-firebase-adminsdk-fbsvc-73c7320882.json");
+// const admin = require("firebase-admin");
+// const serviceAccount = require("./utils/sustylo-firebase-adminsdk-fbsvc-73c7320882.json");
 const userRoutes = require("./routes/userRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const salonRoutes = require("./routes/salonRoutes");
@@ -60,9 +60,9 @@ app.get("/", (req, res) => {
 });
 
 
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-});
+// admin.initializeApp({
+//     credential: admin.credential.cert(serviceAccount)
+// });
 
 app.use(errorHandler);
 
