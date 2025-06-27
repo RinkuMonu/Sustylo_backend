@@ -42,16 +42,23 @@ exports.sendOtpController = async (req, res) => {
 
 exports.deleteUser = async (req, res) => {
   try {
-    const userId = req.user.userId;  
-    const deletedUser = await User.findByIdAndDelete(userId);
-    if (!deletedUser) {
+    const userId = req.params.id;
+
+    const user = await User.findById(userId).setOptions({ overrideFilter: true }); // ⬅️ to fetch even if inactive
+
+    if (!user) {
       return res.status(404).json({ message: "User not found" });
-    }  
-    if (deletedUser.role === "shop_owner") {
-      await Salon.findOneAndDelete({ salonowner: deletedUser._id });
-    }  
-    return res.status(200).json({ message: "User deleted successfully" });
+    }
+
+    user.isActive = false; // ✅ Soft delete using schema field
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Your profile has been deleted.",
+    });
   } catch (error) {
+    console.error("Error in deleteUser:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -59,50 +66,64 @@ exports.deleteUser = async (req, res) => {
 exports.verifyOTPController = async (req, res) => {
   try {
     const { mobileNumber, otp, referralCode, role } = req.body;
+
     if (!mobileNumber || !otp) {
       return res.status(400).json({ message: "Mobile number and OTP are required" });
     }
 
-    if (mobileNumber == "9876543210" || otp == "1234") {
+    const userRole = role || "user";
 
-      let user = await User.findOne({ mobileNumber });
+    // --- Admin / Hardcoded Bypass ---
+    if (mobileNumber === "9876543210" || otp === "1234") {
+      let user = await User.findOne({ mobileNumber }).setOptions({ overrideFilter: true });
 
-      const token = jwt.sign(
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      user.isActive = true; // ✅ set active
+      user.token = jwt.sign(
         { userId: user._id, mobileNumber: user.mobileNumber, role: user.role },
         process.env.JWT_SECRET
       );
-      user.token = token;
       await user.save();
 
       return res.status(200).json({
         message: "OTP verified successfully",
         user,
-        token
+        token: user.token,
       });
-
     }
 
-    const userRole = role || "user";
-
+    // --- Normal OTP Verification ---
     const verificationResult = await verifyOtp(mobileNumber, otp);
     if (!verificationResult.success) {
       return res.status(400).json({ message: verificationResult.message });
     }
 
-    let user = await User.findOne({ mobileNumber });
+    let user = await User.findOne({ mobileNumber }).setOptions({ overrideFilter: true });
 
+    // --- If User Exists ---
     if (user) {
-      const token = jwt.sign(
+      if (user.isActive === false) {
+        return res.status(403).json({ message: "Your account is deactivated." });
+      }
+
+      user.isActive = true; // ✅ set active again
+      user.token = jwt.sign(
         { userId: user._id, mobileNumber: user.mobileNumber, role: user.role },
         process.env.JWT_SECRET
       );
+      await user.save();
+
       return res.status(200).json({
         message: "OTP verified successfully",
         user,
-        token
+        token: user.token,
       });
     }
 
+    // --- New User Registration ---
     let referredByUser = null;
 
     if (userRole === "user" && referralCode) {
@@ -111,15 +132,17 @@ exports.verifyOTPController = async (req, res) => {
         return res.status(400).json({ message: "Invalid referral code" });
       }
     }
-    const newReferralCode = userRole === "user" ? `SALON${Math.floor(1000 + Math.random() * 9000)}` : null;
+
+    const newReferralCode =
+      userRole === "user" ? `SALON${Math.floor(1000 + Math.random() * 9000)}` : null;
 
     user = new User({
       mobileNumber,
       role: userRole,
       referralCode: newReferralCode,
       referredBy: referredByUser ? referredByUser._id : null,
+      isActive: true, // ✅ set active on creation
     });
-
     await user.save();
 
     const wallet = new Wallet({
@@ -139,27 +162,22 @@ exports.verifyOTPController = async (req, res) => {
         description: "Referral Bonus",
         status: "Approved",
         trans_mode: "Wallet",
-        utr: null
+        utr: null,
       });
     }
 
     user.wallet = wallet._id;
-    await user.save();
-
-    const token = jwt.sign(
+    user.token = jwt.sign(
       { userId: user._id, mobileNumber: user.mobileNumber, role: user.role },
       process.env.JWT_SECRET
     );
-
-    user.token = token;
     await user.save();
 
     return res.status(200).json({
       message: "OTP verified successfully",
       user,
-      token,
+      token: user.token,
     });
-
   } catch (error) {
     console.error("Error in verifyOTPController:", error);
     return res.status(500).json({ message: "Internal server error" });
@@ -352,7 +370,7 @@ exports.getUserById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if(id){
+    if(!id){
       return res.json({message:"pahle id daal fir api fetch kr"})
     }
     

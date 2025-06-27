@@ -11,6 +11,7 @@ const {
   getUserReviews,
   addProfilePhoto,
   deleteUser,
+  deleteUserController,
 } = require("../controllers/userController");
 
 const { protect,authorizeSuperAdmin } = require("../authMiddleware/authMiddleware"); 
@@ -30,6 +31,6 @@ router.post("/user/:id/profile-photo", upload.fields([
   { name: "profileImage", maxCount: 1 },
 ]), addProfilePhoto);
 
-router.delete('/me', protect, deleteUser);
+router.delete('/:id', protect, deleteUser);
 
 module.exports = router;
