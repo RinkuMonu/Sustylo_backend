@@ -103,7 +103,10 @@ exports.uploadInlineImage = (req, res) => {
 // Get All Blogs
 exports.getAllBlogs = async (req, res) => {
   try {
-    const blogs = await Blog.find().sort({ createdAt: -1 });
+    const limit = parseInt(req.query.limit) || 0; // get ?limit=6 from query
+    const blogs = await Blog.find()
+      .sort({ createdAt: -1 })
+      .limit(limit); // apply limit
     res.status(200).json(blogs);
   } catch (error) {
     console.error("Error fetching blogs:", error);
