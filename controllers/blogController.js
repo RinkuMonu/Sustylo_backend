@@ -103,14 +103,28 @@ exports.uploadInlineImage = (req, res) => {
 // Get All Blogs
 exports.getAllBlogs = async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 0; // get ?limit=6 from query
+    const page = parseInt(req.query.page) || 1;     
+    const limit = parseInt(req.query.limit) || 6;
+    const skip = (page - 1) * limit;
+
     const blogs = await Blog.find()
       .sort({ createdAt: -1 })
-      .limit(limit); // apply limit
-    res.status(200).json(blogs);
+      .skip(skip)
+      .limit(limit);
+
+    const totalBlogs = await Blog.countDocuments();
+
+    res.status(200).json({
+      success: true,
+      page,
+      limit,
+      totalBlogs,
+      totalPages: Math.ceil(totalBlogs / limit),
+      blogs,
+    });
   } catch (error) {
     console.error("Error fetching blogs:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
