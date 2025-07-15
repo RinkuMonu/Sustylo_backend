@@ -3,6 +3,7 @@ const Commission = require("../models/commissionModel.js"); // Adjust path if ne
 // CREATE
 exports.createCommission = async (req, res) => {
   try {
+    
     const commission = new Commission(req.body);
     await commission.save();
     res.status(201).json({ message: "Commission created", data: commission });
